@@ -70,7 +70,7 @@ def create_mega_account():
     email_data = create_temp_email()
     temp_email = email_data['address']
     email_id = email_data['id']
-    
+
     chrome_options = Options()
     chrome_options.add_argument("--headless")
     chrome_options.add_argument("--no-sandbox")
@@ -79,9 +79,14 @@ def create_mega_account():
 
     try:
         # Use webdriver_manager with Chromium explicitly
+        logging.debug("Setting up ChromeDriver with webdriver_manager...")
         service = Service(ChromeDriverManager(chrome_type=ChromeType.CHROMIUM).install())
         driver = webdriver.Chrome(service=service, options=chrome_options)
         wait = WebDriverWait(driver, 10)
+        logging.debug("ChromeDriver initialized successfully.")
+
+
+
         # Step 1: Open registration page
         driver.get("https://mega.nz/register")
 
