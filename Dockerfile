@@ -20,9 +20,9 @@ RUN apt-get update && apt-get install -y \
     libfontconfig1
 
 # Install Chrome 113 explicitly (using 113.0.5672.63-1)
-RUN wget https://dl.google.com/linux/chrome/deb/pool/main/g/google-chrome-stable/google-chrome-stable_113.0.5672.63-1_amd64.deb && \
-    apt-get install -y ./google-chrome-stable_113.0.5672.63-1_amd64.deb && \
-    rm google-chrome-stable_113.0.5672.63-1_amd64.deb
+RUN wget https://dl.google.com/linux/chrome/deb/pool/main/g/google-chrome-stable/google-chrome-stable_113.0.5672.92-1_amd64.deb && \
+    apt-get install -y ./google-chrome-stable_113.0.5672.92-1_amd64.deb && \
+    rm google-chrome-stable_113.0.5672.92-1_amd64.deb
 
 # Install ChromeDriver 113.0.5672.24
 RUN CHROME_VERSION=$(google-chrome --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+') && \
