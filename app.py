@@ -9,6 +9,9 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 import os
 import logging
+import subprocess
+import zipfile
+import shutil
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -52,7 +55,41 @@ def fetch_email(sid_token, email_id):
     data = response.json()
     return data['mail_body']
 
-### Selenium Browser Setup
+### ChromeDriver Setup
+def get_chrome_version():
+    """Get the installed Chrome version."""
+    try:
+        output = subprocess.check_output(["google-chrome", "--version"]).decode().strip()
+        version = re.search(r"Google Chrome (\d+\.\d+\.\d+\.\d+)", output).group(1)
+        logger.info(f"Detected Chrome version: {version}")
+        return version
+    except Exception as e:
+        logger.error(f"Failed to detect Chrome version: {e}")
+        raise Exception("Google Chrome not installed or not found")
+
+def download_chromedriver(chrome_version):
+    """Download ChromeDriver matching the Chrome version."""
+    base_version = chrome_version.split('.')[0]  # Major version only
+    url = f"https://chromedriver.storage.googleapis.com/LATEST_RELEASE_{base_version}"
+    latest_version = requests.get(url).text.strip()
+    
+    download_url = f"https://chromedriver.storage.googleapis.com/{latest_version}/chromedriver_linux64.zip"
+    chromedriver_zip = "chromedriver_linux64.zip"
+    
+    logger.info(f"Downloading ChromeDriver version {latest_version} from {download_url}")
+    response = requests.get(download_url)
+    with open(chromedriver_zip, 'wb') as f:
+        f.write(response.content)
+    
+    with zipfile.ZipFile(chromedriver_zip, 'r') as zip_ref:
+        zip_ref.extractall(".")
+    
+    chromedriver_path = "./chromedriver"
+    os.chmod(chromedriver_path, 0o755)  # Make executable
+    os.remove(chromedriver_zip)
+    logger.info(f"ChromeDriver downloaded and extracted to {chromedriver_path}")
+    return chromedriver_path
+
 def create_browser():
     """Create a headless Chrome browser instance."""
     options = Options()
@@ -61,14 +98,16 @@ def create_browser():
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--disable-gpu")
     
-    # Specify Chrome binary location if needed (e.g., in CI environments)
+    # Specify Chrome binary location
     chrome_binary = os.getenv("CHROME_BINARY", "/usr/bin/google-chrome")
     options.binary_location = chrome_binary
     
-    # Use a pre-downloaded ChromeDriver or system-installed one
+    # Check for ChromeDriver or download it
     chromedriver_path = os.getenv("CHROMEDRIVER_PATH", "/usr/local/bin/chromedriver")
     if not os.path.exists(chromedriver_path):
-        raise FileNotFoundError(f"ChromeDriver not found at {chromedriver_path}")
+        logger.warning(f"ChromeDriver not found at {chromedriver_path}, attempting to download...")
+        chrome_version = get_chrome_version()
+        chromedriver_path = download_chromedriver(chrome_version)
     
     service = Service(executable_path=chromedriver_path)
     driver = webdriver.Chrome(service=service, options=options)
@@ -81,17 +120,13 @@ def register_mega(driver, email):
     driver.get("https://mega.nz/register")
     time.sleep(2)  # Wait for page to load
 
-    # Fill registration form
     driver.find_element(By.XPATH, "//input[@placeholder='First name']").send_keys("King")
     driver.find_element(By.XPATH, "//input[@placeholder='Last name']").send_keys("Singh")
     driver.find_element(By.XPATH, "//input[@placeholder='Email address']").send_keys(email)
     driver.find_element(By.XPATH, "//input[@placeholder='Password']").send_keys("Study@123")
     driver.find_element(By.XPATH, "//input[@placeholder='Retype password']").send_keys("Study@123")
     
-    # Check terms and conditions checkbox
     driver.find_element(By.XPATH, "//input[@type='checkbox']").click()
-    
-    # Click Sign up button
     driver.find_element(By.CLASS_NAME, "register-button").click()
     time.sleep(5)  # Wait for registration to process
     logger.info("Mega.nz registration submitted")
@@ -116,7 +151,6 @@ def confirm_account(driver, confirm_link):
     driver.get(confirm_link)
     time.sleep(2)  # Wait for page to load
     
-    # Enter password and confirm
     driver.find_element(By.ID, "login-password2").send_keys("Study@123")
     driver.find_element(By.CLASS_NAME, "login-button").click()
     time.sleep(5)  # Wait for confirmation to complete
@@ -133,21 +167,11 @@ def create_mega_account():
     """Orchestrate the Mega.nz account creation process."""
     driver = create_browser()
     try:
-        # Step 1: Get temporary email
         email, sid_token = get_temp_email()
-        
-        # Step 2: Register on Mega.nz
         register_mega(driver, email)
-        
-        # Step 3: Wait for confirmation email
         confirm_link = wait_for_confirmation_email(sid_token)
-        
-        # Step 4: Confirm the account
         confirm_account(driver, confirm_link)
-        
-        # Step 5: Save account details
         save_account(email, "Study@123")
-        
         return email, "Study@123"
     except Exception as e:
         logger.error(f"Error in account creation: {str(e)}")
