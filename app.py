@@ -6,8 +6,13 @@ import time
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
-from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.service import Service
+import os
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Initialize Flask application
 app = Flask(__name__)
@@ -32,6 +37,7 @@ def get_temp_email():
     data = response.json()
     email = data['email_addr']
     sid_token = data['sid_token']
+    logger.info(f"Generated temporary email: {email}")
     return email, sid_token
 
 def check_inbox(sid_token):
@@ -50,11 +56,23 @@ def fetch_email(sid_token, email_id):
 def create_browser():
     """Create a headless Chrome browser instance."""
     options = Options()
-    options.add_argument("--headless")  # Run without UI
+    options.add_argument("--headless")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
-    service = Service(ChromeDriverManager().install())
+    options.add_argument("--disable-gpu")
+    
+    # Specify Chrome binary location if needed (e.g., in CI environments)
+    chrome_binary = os.getenv("CHROME_BINARY", "/usr/bin/google-chrome")
+    options.binary_location = chrome_binary
+    
+    # Use a pre-downloaded ChromeDriver or system-installed one
+    chromedriver_path = os.getenv("CHROMEDRIVER_PATH", "/usr/local/bin/chromedriver")
+    if not os.path.exists(chromedriver_path):
+        raise FileNotFoundError(f"ChromeDriver not found at {chromedriver_path}")
+    
+    service = Service(executable_path=chromedriver_path)
     driver = webdriver.Chrome(service=service, options=options)
+    logger.info("Headless Chrome browser initialized")
     return driver
 
 ### Mega.nz Account Creation Functions
@@ -76,6 +94,7 @@ def register_mega(driver, email):
     # Click Sign up button
     driver.find_element(By.CLASS_NAME, "register-button").click()
     time.sleep(5)  # Wait for registration to process
+    logger.info("Mega.nz registration submitted")
 
 def wait_for_confirmation_email(sid_token, max_wait=300, poll_interval=10):
     """Wait for and extract the confirmation link from the Mega.nz email."""
@@ -87,6 +106,7 @@ def wait_for_confirmation_email(sid_token, max_wait=300, poll_interval=10):
                 email_body = fetch_email(sid_token, email['mail_id'])
                 match = re.search(r"https://mega\.nz/#confirm\w+", email_body)
                 if match:
+                    logger.info(f"Confirmation link found: {match.group(0)}")
                     return match.group(0)
         time.sleep(poll_interval)
     raise Exception("Confirmation email not received within time limit")
@@ -100,12 +120,14 @@ def confirm_account(driver, confirm_link):
     driver.find_element(By.ID, "login-password2").send_keys("Study@123")
     driver.find_element(By.CLASS_NAME, "login-button").click()
     time.sleep(5)  # Wait for confirmation to complete
+    logger.info("Account confirmed")
 
 def save_account(email, password):
     """Save the created account details to the database."""
     account = Account(email=email, password=password)
     db.session.add(account)
     db.session.commit()
+    logger.info(f"Account saved: {email}")
 
 def create_mega_account():
     """Orchestrate the Mega.nz account creation process."""
@@ -127,6 +149,9 @@ def create_mega_account():
         save_account(email, "Study@123")
         
         return email, "Study@123"
+    except Exception as e:
+        logger.error(f"Error in account creation: {str(e)}")
+        raise
     finally:
         driver.quit()
 
@@ -181,4 +206,4 @@ def index():
 
 # Run the Flask application
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, host='0.0.0.0', port=5000)
