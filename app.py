@@ -69,24 +69,26 @@ def extract_confirm_link(email_content):
     raise Exception("Confirmation link not found in email content:\n" + email_content[:500])
 
 def create_mega_account():
-    # Get temporary email
     email_data = create_temp_email()
     temp_email = email_data['address']
     email_id = email_data['id']
 
-    # Updated Chrome options for Render.com
     chrome_options = Options()
     chrome_options.add_argument("--headless")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument("--disable-gpu")
-    chrome_options.add_argument("--disable-features=VizDisplayCompositor")
-    chrome_options.add_argument("--disable-extensions")
-    chrome_options.add_argument("--disable-software-rasterizer")
-    chrome_options.binary_location = "/usr/bin/google-chrome-stable"  # Updated path
+    chrome_options.binary_location = "/usr/bin/chrome"  # Updated path
+    
+    # Add these lines for debugging
+    logging.debug("Chrome path exists: %s", os.path.exists("/usr/bin/chrome"))
+    try:
+        chrome_version = subprocess.check_output(['/usr/bin/chrome', '--version'])
+        logging.debug("Chrome version: %s", chrome_version)
+    except Exception as e:
+        logging.error("Failed to get Chrome version: %s", str(e))
 
     try:
-        service = Service(ChromeDriverManager().install())
+        service = Service(ChromeDriverManager(chrome_type='google-chrome').install())
         driver = webdriver.Chrome(service=service, options=chrome_options)
         wait = WebDriverWait(driver, 10)
 
