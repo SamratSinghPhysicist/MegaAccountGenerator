@@ -70,7 +70,7 @@ def create_mega_account():
     email_data = create_temp_email()
     temp_email = email_data['address']
     email_id = email_data['id']
-
+    
     chrome_options = Options()
     chrome_options.add_argument("--headless")
     chrome_options.add_argument("--no-sandbox")
@@ -78,11 +78,10 @@ def create_mega_account():
     chrome_options.binary_location = "/usr/bin/chromium-browser"  # Render.com's Chromium path
 
     try:
-        # Use webdriver_manager to handle ChromeDriver automatically
-        service = Service(ChromeDriverManager().install())
+        # Use webdriver_manager with Chromium explicitly
+        service = Service(ChromeDriverManager(chrome_type=ChromeType.CHROMIUM).install())
         driver = webdriver.Chrome(service=service, options=chrome_options)
         wait = WebDriverWait(driver, 10)
-
         # Step 1: Open registration page
         driver.get("https://mega.nz/register")
 
