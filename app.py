@@ -1,3 +1,4 @@
+import subprocess
 import requests
 import time
 import re
@@ -77,18 +78,10 @@ def create_mega_account():
     chrome_options.add_argument("--headless")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.binary_location = "/usr/bin/chrome"  # Updated path
-    
-    # Add these lines for debugging
-    logging.debug("Chrome path exists: %s", os.path.exists("/usr/bin/chrome"))
-    try:
-        chrome_version = subprocess.check_output(['/usr/bin/chrome', '--version'])
-        logging.debug("Chrome version: %s", chrome_version)
-    except Exception as e:
-        logging.error("Failed to get Chrome version: %s", str(e))
+    chrome_options.binary_location = "/usr/bin/chromium-browser"
 
     try:
-        service = Service(ChromeDriverManager(chrome_type='google-chrome').install())
+        service = Service("/usr/bin/chromedriver")  # Direct path to chromedriver
         driver = webdriver.Chrome(service=service, options=chrome_options)
         wait = WebDriverWait(driver, 10)
 

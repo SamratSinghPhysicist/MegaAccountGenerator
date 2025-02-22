@@ -1,22 +1,31 @@
 #!/usr/bin/env bash
-# Exit on error
 set -o errexit
 
-# Add Chrome's repository key
-wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add -
-
-# Add Chrome's repository
-echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list
-
-# Update package list and install Chrome
+# Install Chrome dependencies
 apt-get update
-apt-get install -y google-chrome-stable
+apt-get install -y --no-install-recommends \
+    apt-transport-https \
+    ca-certificates \
+    curl \
+    gnupg \
+    hicolor-icon-theme \
+    libcanberra-gtk* \
+    libgl1-mesa-dri \
+    libgl1-mesa-glx \
+    libpango1.0-0 \
+    libpulse0 \
+    libv4l-0 \
+    fonts-symbola \
+    unzip \
+    wget \
+    xdg-utils
 
-# Create symlink to chrome binary
-ln -sf /usr/bin/google-chrome-stable /usr/bin/chrome
+# Install Chrome from Ubuntu repository
+apt-get install -y chromium-browser chromium-chromedriver
+
+# Print installed versions
+chromium-browser --version
+chromedriver --version
 
 # Install Python dependencies
 pip install -r requirements.txt
-
-# Print Chrome version for verification
-google-chrome-stable --version
