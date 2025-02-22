@@ -1,10 +1,8 @@
-import subprocess
 import requests
 import time
 import re
 import logging
 import os
-
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
@@ -12,7 +10,6 @@ from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-
 from flask import Flask, jsonify, render_template, request
 
 # Set up logging
@@ -78,13 +75,13 @@ def create_mega_account():
     chrome_options.add_argument("--headless")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.binary_location = "/usr/bin/chromium-browser"
+    chrome_options.binary_location = "/usr/bin/chromium-browser"  # Render.com's Chromium path
 
     try:
-        service = Service("/usr/bin/chromedriver")  # Direct path to chromedriver
+        # Use webdriver_manager to handle ChromeDriver automatically
+        service = Service(ChromeDriverManager().install())
         driver = webdriver.Chrome(service=service, options=chrome_options)
         wait = WebDriverWait(driver, 10)
-
 
         # Step 1: Open registration page
         driver.get("https://mega.nz/register")

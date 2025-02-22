@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 set -o errexit
 
-# Install Chrome dependencies
+# Update package lists
 apt-get update
+
+# Install Chrome dependencies
 apt-get install -y --no-install-recommends \
     apt-transport-https \
     ca-certificates \
@@ -20,12 +22,11 @@ apt-get install -y --no-install-recommends \
     wget \
     xdg-utils
 
-# Install Chrome from Ubuntu repository
-apt-get install -y chromium-browser chromium-chromedriver
+# Install Chromium
+apt-get install -y chromium-browser
 
-# Print installed versions
+# Verify installations
 chromium-browser --version
-chromedriver --version
 
 # Install Python dependencies
 pip install -r requirements.txt
