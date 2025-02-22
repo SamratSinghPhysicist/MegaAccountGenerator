@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Mega.nz Account Generator</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; }
+        #result { margin-top: 20px; }
+        button { padding: 10px 20px; font-size: 16px; }
+    </style>
+</head>
+<body>
+    <h1>Mega.nz Account Generator</h1>
+    <button onclick="generateAccount()">Generate New Account</button>
+    <div id="result"></div>
+
+    <script>
+        function generateAccount() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = "Generating account, please wait...";
+
+            fetch('/generate_account', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        resultDiv.innerHTML = `
+                            <p>Account created successfully!</p>
+                            <p>Email: ${data.account.email}</p>
+                            <p>Password: ${data.account.password}</p>
+                            <p>Details saved to a text file on the server.</p>
+                        `;
+                    } else {
+                        resultDiv.innerHTML = `<p>Error: ${data.message}</p>`;
+                    }
+                })
+                .catch(error => {
+                    resultDiv.innerHTML = `<p>Request failed: ${error}</p>`;
+                });
+        }
+    </script>
+</body>
+</html>

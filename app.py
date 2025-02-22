@@ -1,169 +1,182 @@
-from flask import Flask, request, jsonify
-from flask_sqlalchemy import SQLAlchemy
 import requests
-import re
 import time
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service
-import os
+import re
 import logging
 
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+
+from flask import Flask, jsonify, render_template, request
+import os
+
 # Set up logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# Initialize Flask application
-app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///accounts.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-db = SQLAlchemy(app)
+# Temporary Email Service API Configuration
+API_MAIN_DOMAIN = "https://mailtemp-production.up.railway.app/"
+BASE_URL = f"{API_MAIN_DOMAIN}api"
 
-# Define the Account model for the database
-class Account(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    email = db.Column(db.String(120), unique=True, nullable=False)
-    password = db.Column(db.String(120), nullable=False)
+def create_temp_email():
+    """Create a temporary email address using the MailTemp API"""
+    logging.debug("Creating temporary email...")
+    response = requests.post(f"{BASE_URL}/email")
+    if response.status_code == 200:
+        data = response.json()
+        logging.debug(f"Email created: {data['address']}")
+        return data
+    else:
+        logging.error(f"Email creation failed: {response.json().get('details', 'No details')}")
+        raise Exception(f"Failed to create email: {response.json()['message']}")
 
-# Create the database tables
-with app.app_context():
-    db.create_all()
+def get_messages(email_id):
+    """Get messages for a specific email ID using the MailTemp API"""
+    logging.debug(f"Fetching messages for email ID: {email_id}")
+    response = requests.get(f"{BASE_URL}/email/{email_id}/messages")
+    if response.status_code == 200:
+        return response.json()
+    raise Exception(f"Failed to get messages: {response.json().get('message', 'Unknown error')}")
 
-### Temporary Email Functions
-def get_temp_email():
-    response = requests.get("https://api.guerrillamail.com/ajax.php?f=get_email_address")
-    data = response.json()
-    email = data['email_addr']
-    sid_token = data['sid_token']
-    logger.info(f"Generated temporary email: {email}")
-    return email, sid_token
+def wait_for_confirmation_email(email_id):
+    """Poll for the Mega.nz confirmation email"""
+    logging.debug("Waiting for confirmation email...")
+    for _ in range(30):  # Wait up to 5 minutes
+        messages = get_messages(email_id)
+        for message in messages:
+            if message['from'] == "welcome@mega.nz":
+                content = message['content']
+                if isinstance(content, list):
+                    content = " ".join(str(item) for item in content)
+                elif not isinstance(content, str):
+                    content = str(content)
+                logging.debug("Confirmation email received.")
+                return content
+        time.sleep(10)
+    raise Exception("Confirmation email not received within 5 minutes")
 
-def check_inbox(sid_token):
-    response = requests.get(f"https://api.guerrillamail.com/ajax.php?f=check_email&sid_token={sid_token}&seq=0")
-    data = response.json()
-    return data['list']
-
-def fetch_email(sid_token, email_id):
-    response = requests.get(f"https://api.guerrillamail.com/ajax.php?f=fetch_email&sid_token={sid_token}&email_id={email_id}")
-    data = response.json()
-    return data['mail_body']
-
-### Chrome Setup for Render
-def create_browser():
-    options = Options()
-    options.add_argument("--headless")  # Required for Render
-    options.add_argument("--no-sandbox")  # Required for Render
-    options.add_argument("--disable-dev-shm-usage")  # Avoids Chrome crashing
-    options.add_argument("--disable-gpu")
-    options.binary_location = "/usr/bin/google-chrome"  # Render’s Chrome path
-    service = Service(executable_path="/usr/bin/chromedriver")
-    driver = webdriver.Chrome(service=service, options=options)
-    logger.info("Headless Chrome browser initialized")
-    return driver
-
-### Mega.nz Account Creation Functions
-def register_mega(driver, email):
-    driver.get("https://mega.nz/register")
-    time.sleep(2)
-    driver.find_element(By.XPATH, "//input[@placeholder='First name']").send_keys("King")
-    driver.find_element(By.XPATH, "//input[@placeholder='Last name']").send_keys("Singh")
-    driver.find_element(By.XPATH, "//input[@placeholder='Email address']").send_keys(email)
-    driver.find_element(By.XPATH, "//input[@placeholder='Password']").send_keys("Study@123")
-    driver.find_element(By.XPATH, "//input[@placeholder='Retype password']").send_keys("Study@123")
-    driver.find_element(By.XPATH, "//input[@type='checkbox']").click()
-    driver.find_element(By.CLASS_NAME, "register-button").click()
-    time.sleep(5)
-    logger.info("Mega.nz registration submitted")
-
-def wait_for_confirmation_email(sid_token, max_wait=300, poll_interval=10):
-    start_time = time.time()
-    while time.time() - start_time < max_wait:
-        emails = check_inbox(sid_token)
-        for email in emails:
-            if email['mail_from'] == "welcome@mega.nz":
-                email_body = fetch_email(sid_token, email['mail_id'])
-                match = re.search(r"https://mega\.nz/#confirm\w+", email_body)
-                if match:
-                    logger.info(f"Confirmation link found: {match.group(0)}")
-                    return match.group(0)
-        time.sleep(poll_interval)
-    raise Exception("Confirmation email not received within time limit")
-
-def confirm_account(driver, confirm_link):
-    driver.get(confirm_link)
-    time.sleep(2)
-    driver.find_element(By.ID, "login-password2").send_keys("Study@123")
-    driver.find_element(By.CLASS_NAME, "login-button").click()
-    time.sleep(5)
-    logger.info("Account confirmed")
-
-def save_account(email, password):
-    account = Account(email=email, password=password)
-    db.session.add(account)
-    db.session.commit()
-    logger.info(f"Account saved: {email}")
+def extract_confirm_link(email_content):
+    """Extract the confirmation link from the email content"""
+    if not isinstance(email_content, str):
+        raise Exception(f"Invalid email content type: {type(email_content)}. Expected string.")
+    match = re.search(r'https://mega\.nz/#confirm\w+', email_content)
+    if match:
+        logging.debug(f"Confirmation link extracted: {match.group(0)}")
+        return match.group(0)
+    raise Exception("Confirmation link not found in email content:\n" + email_content[:500])
 
 def create_mega_account():
-    driver = create_browser()
+    # Get temporary email
+    email_data = create_temp_email()
+    temp_email = email_data['address']
+    email_id = email_data['id']
+
+    # Set up Chrome (non-headless for debugging visibility)
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")  # Uncomment for production
+    chrome_options.add_argument("--no-sandbox")  # Prevent sandboxing issues
+    chrome_options.add_argument("--disable-dev-shm-usage")  # Avoid shared memory issues
+    driver = webdriver.Chrome(options=chrome_options)
+    wait = WebDriverWait(driver, 10)
+
     try:
-        email, sid_token = get_temp_email()
-        register_mega(driver, email)
-        confirm_link = wait_for_confirmation_email(sid_token)
-        confirm_account(driver, confirm_link)
-        save_account(email, "Study@123")
-        return email, "Study@123"
+        # Step 1: Open registration page
+        driver.get("https://mega.nz/register")
+
+        # Step 2: Fill registration form
+        # First name
+        wait.until(EC.visibility_of_element_located(
+            (By.ID, "register-firstname-registerpage2")
+        )).send_keys("KingSingh")
+
+        # Last name
+        driver.find_element(By.ID, "register-lastname-registerpage2").send_keys("SamSingh")
+
+        # Email
+        driver.find_element(By.ID, "register-email-registerpage2").send_keys(temp_email)
+
+        # Password field
+        password_field = wait.until(EC.visibility_of_element_located(
+            (By.ID, "register-password-registerpage2")
+        ))
+        password_field.click()  # Focus the field to trigger any JS
+        password_field.send_keys("Study@123")
+
+        time.sleep(1)
+
+        # Retype password field
+        retype_password_field = wait.until(EC.visibility_of_element_located(
+            (By.ID, "register-password-registerpage3")
+        ))
+        retype_password_field.click()  # Focus the field
+        time.sleep(1)
+        retype_password_field.send_keys("Study@123")
+
+        time.sleep(1)
+        # Step 3: Check terms checkbox if not already checked
+        driver.find_element(By.XPATH, "//input[@type='checkbox' and @tabindex='6']").click()
+
+        time.sleep(1)
+
+        driver.find_element(By.XPATH, "//input[@type='checkbox' and @tabindex='7']").click()
+
+        time.sleep(1)
+
+        # Step 4: Click Sign Up
+        sign_up_button = wait.until(EC.element_to_be_clickable(
+            (By.CLASS_NAME, "register-button")
+        ))
+        sign_up_button.click()
+
+        # Step 5: Wait for confirmation email
+        email_content = wait_for_confirmation_email(email_id)
+        confirm_link = extract_confirm_link(email_content)
+        logging.debug("Navigating to confirmation link...")
+        time.sleep(5)
+        driver.get(confirm_link)
+        
+        # Step 6: Confirm account
+        logging.debug("Entering confirmation password...")
+        time.sleep(5)
+        wait.until(EC.presence_of_element_located(
+            (By.ID, "login-password2")
+        )).send_keys("Study@123")
+        driver.find_element(By.CLASS_NAME, "login-button").click()
+
+        # Step 7: Wait for account to be active
+        logging.debug("Waiting for account activation...")
+        time.sleep(10)
+        driver.get("https://mega.nz/")
+        time.sleep(10)
+
+        # Step 8: Save account details
+        account_details = {"email": temp_email, "password": "Study@123"}
+        with open(f"mega_account_{int(time.time())}.txt", "w") as f:
+            f.write(f"Email: {temp_email}\nPassword: Study@123\n")
+
+        return account_details
+
     except Exception as e:
-        logger.error(f"Error in account creation: {str(e)}")
-        raise
+        logging.error(f"Exception occurred: {str(e)}")
+        raise Exception(f"Account creation failed: {str(e)}")
     finally:
         driver.quit()
 
-### Flask Routes
-@app.route('/create_account', methods=['POST'])
-def create_account_route():
-    try:
-        email, password = create_mega_account()
-        return jsonify({'status': 'success', 'email': email, 'password': password})
-    except Exception as e:
-        return jsonify({'status': 'error', 'message': str(e)})
-
-@app.route('/accounts', methods=['GET'])
-def list_accounts():
-    accounts = Account.query.all()
-    return jsonify({'accounts': [{'email': acc.email, 'password': acc.password} for acc in accounts]})
+app = Flask(__name__)
 
 @app.route('/')
 def index():
-    return '''
-    <html>
-    <body>
-        <h1>Mega.nz Account Creator</h1>
-        <button onclick="createAccount()">Create New Account</button>
-        <div id="result"></div>
-        <script>
-            function createAccount() {
-                document.getElementById('result').innerText = 'Creating account, please wait...';
-                fetch('/create_account', {method: 'POST'})
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.status === 'success') {
-                            document.getElementById('result').innerText = 
-                                `Account created: ${data.email} (Password: ${data.password})`;
-                        } else {
-                            document.getElementById('result').innerText = 
-                                `Error: ${data.message}`;
-                        }
-                    })
-                    .catch(error => {
-                        document.getElementById('result').innerText = 
-                            `Network error: ${error.message}`;
-                    });
-            }
-        </script>
-    </body>
-    </html>
-    '''
+    return render_template('index.html')
+
+@app.route('/generate_account', methods=['POST'])
+def generate_account():
+    try:
+        account_details = create_mega_account()
+        return jsonify({"status": "success", "account": account_details})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=True)
+
