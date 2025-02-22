@@ -24,11 +24,11 @@ RUN wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.d
     apt-get install -y ./google-chrome-stable_current_amd64.deb && \
     rm google-chrome-stable_current_amd64.deb
 
-# Get Chrome version and fetch matching ChromeDriver with fallback
-RUN CHROME_MAJOR_VERSION=$(google-chrome --version | grep -oE '[0-9]+' | head -1) && \
-    echo "Chrome major version: $CHROME_MAJOR_VERSION" && \
-    CHROMEDRIVER_VERSION="133.0.6943.106" && \  # Known working version for Chrome 133
-    echo "ChromeDriver version: $CHROMEDRIVER_VERSION" && \
+# Install a hardcoded ChromeDriver version compatible with Chrome 133
+RUN CHROME_VERSION=$(google-chrome --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+') && \
+    echo "Chrome version: $CHROME_VERSION" && \
+    CHROMEDRIVER_VERSION="133.0.6943.106" && \
+    echo "Hardcoded ChromeDriver version: $CHROMEDRIVER_VERSION" && \
     wget -O /tmp/chromedriver.zip https://chromedriver.storage.googleapis.com/${CHROMEDRIVER_VERSION}/chromedriver_linux64.zip && \
     unzip /tmp/chromedriver.zip -d /usr/bin/ && \
     chmod +x /usr/bin/chromedriver && \
