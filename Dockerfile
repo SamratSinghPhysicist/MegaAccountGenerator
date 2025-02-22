@@ -1,5 +1,5 @@
 # Use an official Ubuntu base image
-FROM Ubuntu:20.04
+FROM ubuntu:20.04
 
 # Set working directory
 WORKDIR /app
@@ -20,13 +20,13 @@ RUN apt-get update && apt-get install -y \
     libfontconfig1
 
 # Install the latest Chrome
-RUN wget https://dl.google.com/linux/chrome/deb/pool/main/g/google-chrome-stable/google-chrome-stable_current_amd64.deb && \
+RUN wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb && \
     apt-get install -y ./google-chrome-stable_current_amd64.deb && \
     rm google-chrome-stable_current_amd64.deb
 
 # Install the latest ChromeDriver
-RUN CHROMEDRIVER_VERSION=$(curl -s https://chromedriver.storage.google.com/LATEST-release) && \
-    wget -O /tmp/chromedriver.zip https://chromedriver.storage.google.com/$CHROMEDRIVER_VERSION/chromedriver-linux64.zip && \
+RUN CHROMEDRIVER_VERSION=$(curl -sS https://chromedriver.storage.googleapis.com/LATEST_RELEASE) && \
+    wget -O /tmp/chromedriver.zip https://chromedriver.storage.googleapis.com/${CHROMEDRIVER_VERSION}/chromedriver_linux64.zip && \
     unzip /tmp/chromedriver.zip -d /usr/bin/ && \
     chmod +x /usr/bin/chromedriver && \
     rm /tmp/chromedriver.zip
