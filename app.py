@@ -86,11 +86,11 @@ def create_mega_account():
     chrome_options.binary_location = "/usr/bin/google-chrome-stable"  # Updated path
 
     try:
-        service = Service(ChromeDriverManager(version="latest").install())
+        service = Service(ChromeDriverManager().install())
         driver = webdriver.Chrome(service=service, options=chrome_options)
         wait = WebDriverWait(driver, 10)
 
-        
+
         # Step 1: Open registration page
         driver.get("https://mega.nz/register")
 
