@@ -1,0 +1,5 @@
+Flask==2.3.3
+Flask-SQLAlchemy==3.0.5
+requests==2.31.0
+selenium==4.15.2
+gunicorn==21.2.0
