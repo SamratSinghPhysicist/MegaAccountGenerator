@@ -7,7 +7,7 @@ WORKDIR /app
 # Prevent interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install system dependencies and Chrome
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     python3 \
     python3-pip \
@@ -17,19 +17,25 @@ RUN apt-get update && apt-get install -y \
     libglib2.0-0 \
     libnss3 \
     libgconf-2-4 \
-    libfontconfig1 \
-    && wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb \
-    && apt-get install -y ./google-chrome-stable_current_amd64.deb \
-    && rm google-chrome-stable_current_amd64.deb \
-    # Get the installed Chrome version
-    && CHROME_VERSION=$(google-chrome --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+') \
-    # Fetch the matching ChromeDriver version
-    && CHROMEDRIVER_VERSION=$(curl -sS https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_VERSION}) \
-    && wget -O /tmp/chromedriver.zip https://chromedriver.storage.googleapis.com/${CHROMEDRIVER_VERSION}/chromedriver_linux64.zip \
-    && unzip /tmp/chromedriver.zip -d /usr/bin/ \
-    && chmod +x /usr/bin/chromedriver \
-    && rm /tmp/chromedriver.zip \
-    && apt-get clean
+    libfontconfig1
+
+# Install Chrome
+RUN wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb && \
+    apt-get install -y ./google-chrome-stable_current_amd64.deb && \
+    rm google-chrome-stable_current_amd64.deb
+
+# Get Chrome version and fetch matching ChromeDriver
+RUN CHROME_VERSION=$(google-chrome --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+') && \
+    echo "Chrome version: $CHROME_VERSION" && \
+    CHROMEDRIVER_VERSION=$(curl -sS https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_VERSION} || curl -sS https://chromedriver.storage.googleapis.com/LATEST_RELEASE) && \
+    echo "ChromeDriver version: $CHROMEDRIVER_VERSION" && \
+    wget -O /tmp/chromedriver.zip https://chromedriver.storage.googleapis.com/${CHROMEDRIVER_VERSION}/chromedriver_linux64.zip && \
+    unzip /tmp/chromedriver.zip -d /usr/bin/ && \
+    chmod +x /usr/bin/chromedriver && \
+    rm /tmp/chromedriver.zip
+
+# Clean up
+RUN apt-get clean
 
 # Copy application files
 COPY requirements.txt .
