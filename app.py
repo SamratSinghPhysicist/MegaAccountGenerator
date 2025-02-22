@@ -75,12 +75,12 @@ def create_mega_account():
     chrome_options.add_argument("--headless")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.binary_location = "/usr/bin/chromium-browser"  # Render.com's Chromium path
+    chrome_options.binary_location = "/usr/bin/chromium"  # Render.com's Chromium path
 
     try:
         # Use webdriver_manager with Chromium explicitly
         logging.debug("Setting up ChromeDriver with webdriver_manager...")
-        service = Service(ChromeDriverManager(chrome_type=ChromeType.CHROMIUM).install())
+        service = Service(ChromeDriverManager().install())
         driver = webdriver.Chrome(service=service, options=chrome_options)
         wait = WebDriverWait(driver, 10)
         logging.debug("ChromeDriver initialized successfully.")
