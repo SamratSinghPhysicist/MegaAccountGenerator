@@ -12,6 +12,7 @@ import logging
 import subprocess
 import zipfile
 import shutil
+import platform
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -58,28 +59,32 @@ def fetch_email(sid_token, email_id):
 ### Chrome and ChromeDriver Setup
 def find_chrome_binary():
     """Dynamically locate the Chrome binary on the system."""
-    possible_paths = [
-        "/usr/bin/google-chrome",           # Default Linux
-        "/usr/lib/chromium-browser/chrome", # Chromium alternative
-        "/usr/bin/google-chrome-stable",    # Some Linux distros
-        "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",  # Windows
-        "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",  # Windows 32-bit
-        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"  # macOS
-    ]
+    possible_paths = {
+        'Windows': [
+            "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+            "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
+        ],
+        'Linux': [
+            "/usr/bin/google-chrome",
+            "/usr/lib/chromium-browser/chrome",
+            "/usr/bin/google-chrome-stable",
+        ],
+        'Darwin': [  # macOS
+            "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+        ]
+    }
     
-    # Check environment variable first
+    system = platform.system()
     chrome_binary = os.getenv("CHROME_BINARY")
     if chrome_binary and os.path.exists(chrome_binary):
         logger.info(f"Using Chrome binary from CHROME_BINARY: {chrome_binary}")
         return chrome_binary
     
-    # Try common locations
-    for path in possible_paths:
+    for path in possible_paths.get(system, []):
         if os.path.exists(path):
             logger.info(f"Found Chrome binary at: {path}")
             return path
     
-    # Try system PATH
     try:
         chrome_path = shutil.which("google-chrome") or shutil.which("chrome")
         if chrome_path:
@@ -88,7 +93,7 @@ def find_chrome_binary():
     except Exception:
         pass
     
-    raise Exception("Google Chrome not found in common locations or PATH")
+    raise Exception(f"Google Chrome not found on {system}. Set CHROME_BINARY environment variable.")
 
 def get_chrome_version(chrome_binary):
     """Get the installed Chrome version using the binary."""
@@ -104,26 +109,46 @@ def get_chrome_version(chrome_binary):
 
 def download_chromedriver(chrome_version):
     """Download ChromeDriver matching the Chrome version."""
-    base_version = chrome_version.split('.')[0]  # Major version only
+    system = platform.system()
+    base_version = chrome_version.split('.')[0]
     url = f"https://chromedriver.storage.googleapis.com/LATEST_RELEASE_{base_version}"
-    latest_version = requests.get(url).text.strip()
     
-    download_url = f"https://chromedriver.storage.googleapis.com/{latest_version}/chromedriver_{'win32' if os.name == 'nt' else 'linux64'}.zip"
+    try:
+        logger.info(f"Fetching latest ChromeDriver version for Chrome {base_version} from {url}")
+        latest_version = requests.get(url, timeout=10).text.strip()
+    except requests.RequestException as e:
+        logger.error(f"Failed to fetch ChromeDriver version: {e}")
+        raise Exception(f"Could not fetch ChromeDriver version: {e}")
+    
+    platform_map = {
+        'Windows': 'win32',
+        'Linux': 'linux64',
+        'Darwin': 'mac64'
+    }
+    platform_suffix = platform_map.get(system, 'linux64')  # Default to linux64 if unknown
+    download_url = f"https://chromedriver.storage.googleapis.com/{latest_version}/chromedriver_{platform_suffix}.zip"
     chromedriver_zip = "chromedriver.zip"
     
     logger.info(f"Downloading ChromeDriver version {latest_version} from {download_url}")
-    response = requests.get(download_url)
-    with open(chromedriver_zip, 'wb') as f:
-        f.write(response.content)
+    try:
+        response = requests.get(download_url, timeout=30)
+        response.raise_for_status()
+        with open(chromedriver_zip, 'wb') as f:
+            f.write(response.content)
+    except requests.RequestException as e:
+        logger.error(f"Failed to download ChromeDriver: {e}")
+        raise Exception(f"Could not download ChromeDriver: {e}")
     
+    logger.info("Extracting ChromeDriver...")
     with zipfile.ZipFile(chromedriver_zip, 'r') as zip_ref:
         zip_ref.extractall(".")
     
-    chromedriver_path = "./chromedriver.exe" if os.name == 'nt' else "./chromedriver"
-    os.chmod(chromedriver_path, 0o755) if os.name != 'nt' else None  # Make executable on non-Windows
+    chromedriver_path = "chromedriver.exe" if system == 'Windows' else "chromedriver"
+    if system != 'Windows':
+        os.chmod(chromedriver_path, 0o755)  # Make executable on Linux/macOS
     os.remove(chromedriver_zip)
-    logger.info(f"ChromeDriver downloaded and extracted to {chromedriver_path}")
-    return chromedriver_path
+    logger.info(f"ChromeDriver downloaded and extracted to ./{chromedriver_path}")
+    return f"./{chromedriver_path}"
 
 def create_browser():
     """Create a headless Chrome browser instance."""
@@ -133,12 +158,13 @@ def create_browser():
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--disable-gpu")
     
-    # Locate Chrome binary
     chrome_binary = find_chrome_binary()
     options.binary_location = chrome_binary
     
-    # Check for ChromeDriver or download it
-    chromedriver_path = os.getenv("CHROMEDRIVER_PATH", "/usr/local/bin/chromedriver")
+    system = platform.system()
+    default_chromedriver_path = "chromedriver.exe" if system == 'Windows' else "chromedriver"
+    chromedriver_path = os.getenv("CHROMEDRIVER_PATH", f"./{default_chromedriver_path}")
+    
     if not os.path.exists(chromedriver_path):
         logger.warning(f"ChromeDriver not found at {chromedriver_path}, attempting to download...")
         chrome_version = get_chrome_version(chrome_binary)
