@@ -12,7 +12,6 @@ import logging
 import subprocess
 import zipfile
 import shutil
-import sys
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -126,7 +125,7 @@ def download_chromedriver(chrome_version):
     logger.info(f"ChromeDriver downloaded and extracted to {chromedriver_path}")
     return chromedriver_path
 
-def create越し():
+def create_browser():
     """Create a headless Chrome browser instance."""
     options = Options()
     options.add_argument("--headless")
