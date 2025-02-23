@@ -2,8 +2,13 @@
 FROM cypress/browser:latest
 
 #Downloading Chrome
-wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
-sudo apt install ./google-chrome-stable_current_amd64.deb
+sudo apt-get purge google-chrome-stable
+sudo wget http://dl.google.com/linux/chrome/deb/pool/main/g/google-chrome-stable/google-chrome-stable_97.0.4692.71-1_amd64.deb && \
+sudo dpkg -i google-chrome-stable_97.0.4692.71-1_amd64.deb && \
+sudo apt-mark hold google-chrome-stable
+
+wget https://chromedriver.storage.googleapis.com/97.0.4692.71/chromedriver_linux64.zip
+sudo unzip chromedriver_linux64.zip chromedriver -d /usr/local/bin
 
 # Set the port as an argument (default to 5000 for Flask compatibility with Render.com)
 ARG PORT=5000
