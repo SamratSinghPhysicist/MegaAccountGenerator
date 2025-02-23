@@ -81,7 +81,8 @@ def create_mega_account():
         # Use webdriver_manager with Chromium explicitly
         logging.debug("Setting up ChromeDriver with webdriver_manager...")
         service = Service(ChromeDriverManager().install())
-        driver = webdriver.Chrome(service=service, options=chrome_options)
+        driver = webdriver.Chrome('/usr/lib/chromium-browser/chromedriver', options = options)
+        # driver = webdriver.Chrome(service=service, options=chrome_options)
         wait = WebDriverWait(driver, 10)
         logging.debug("ChromeDriver initialized successfully.")
 
