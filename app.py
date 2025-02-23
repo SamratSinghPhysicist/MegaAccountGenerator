@@ -75,12 +75,19 @@ def create_mega_account():
     chrome_options.add_argument("--headless")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.binary_location = "/usr/bin/chromium"  # Path to Chromium binary
+    chrome_options.binary_location = "/usr/bin/chromium"
 
+    driver = None
     try:
-        # Use the pre-installed chromedriver instead of webdriver_manager
         logging.debug("Setting up ChromeDriver manually...")
-        service = Service(executable_path="/usr/bin/chromedriver")  # Path to chromium-driver
+        # Log Chromium and ChromeDriver versions
+        import subprocess
+        chromium_version = subprocess.check_output(["/usr/bin/chromium", "--version"]).decode().strip()
+        chromedriver_version = subprocess.check_output(["/usr/bin/chromedriver", "--version"]).decode().strip()
+        logging.debug(f"Chromium version: {chromium_version}")
+        logging.debug(f"ChromeDriver version: {chromedriver_version}")
+
+        service = Service(executable_path="/usr/bin/chromedriver")
         driver = webdriver.Chrome(service=service, options=chrome_options)
         wait = WebDriverWait(driver, 10)
         logging.debug("ChromeDriver initialized successfully.")
@@ -165,7 +172,8 @@ def create_mega_account():
         logging.error(f"Exception occurred: {str(e)}")
         raise Exception(f"Account creation failed: {str(e)}")
     finally:
-        driver.quit()
+        if driver is not None:
+            driver.quit()
 
 app = Flask(__name__)
 
