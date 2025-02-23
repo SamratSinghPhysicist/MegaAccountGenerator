@@ -1,6 +1,11 @@
 # Use cypress/browser:latest as the base image (includes Chromium and dependencies)
 FROM cypress/browser:latest
 
+#Downloading Chrome
+wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+sudo dpkg -i google-chrome-stable_current_amd64.deb
+sudo apt-get install -f
+
 # Set the port as an argument (default to 5000 for Flask compatibility with Render.com)
 ARG PORT=5000
 ENV PORT=$PORT
