@@ -75,17 +75,15 @@ def create_mega_account():
     chrome_options.add_argument("--headless")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.binary_location = "/usr/bin/chromium"  # Render.com's Chromium path
+    chrome_options.binary_location = "/usr/bin/chromium"  # Path to Chromium binary
 
     try:
-        # Use webdriver_manager with Chromium explicitly
-        logging.debug("Setting up ChromeDriver with webdriver_manager...")
-        service = Service(ChromeDriverManager().install())        
+        # Use the pre-installed chromedriver instead of webdriver_manager
+        logging.debug("Setting up ChromeDriver manually...")
+        service = Service(executable_path="/usr/bin/chromedriver")  # Path to chromium-driver
         driver = webdriver.Chrome(service=service, options=chrome_options)
         wait = WebDriverWait(driver, 10)
         logging.debug("ChromeDriver initialized successfully.")
-
-
 
         # Step 1: Open registration page
         driver.get("https://mega.nz/register")
